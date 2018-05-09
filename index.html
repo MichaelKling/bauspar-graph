@@ -1,0 +1,285 @@
+<head>
+    <meta charset="UTF-8">
+    <!-- Plotly.js -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+<!-- Plotly chart will be drawn inside this DIV -->
+<div id="myDiv" style="width:100%;height:100%"></div>
+<hr />
+<div id="myDiv2" style="width:100%;height:100%"></div>
+<hr />
+<div id="myDiv3" style="width:100%;height:100%"></div>
+<hr />
+<div id="myDiv4" style="width:100%;height:100%"></div>
+<div id="hoverinfo" style="position: fixed; top: 10px; left: 10px; margin-left:10px;font-size:10px;"></div>
+<script>
+
+
+    hoverInfo = document.getElementById('hoverinfo');
+    myPlot = document.getElementById('myDiv');
+    myPlot2 = document.getElementById('myDiv2');
+    myPlot3 = document.getElementById('myDiv3');
+    myPlot4 = document.getElementById('myDiv4');
+    Plotly.d3.json('list.json', function (err, rows) {
+        function createData(rows, filter, xAxis, yAxis, zAxis, colorAxis, colorscale,cmin,cmax) {
+            let x = [];
+            let y = [];
+            for (let i = 0; i < rows.length; i++) {
+                let row = rows[i];
+                if (filter(rows[i])) {
+                    //1 - Determine all X Values/Get X Axis
+                    x.push(row[xAxis]);
+                    //2 - Determine all Y Values/Get Y Axis
+                    y.push(row[yAxis]);
+                }
+            }
+            x = x.filter(function(v, i, a) { return a.indexOf(v) === i } );
+            y = y.filter(function(v, i, a) { return a.indexOf(v) === i } );
+
+            //3 - Create X/Y Field of Objects
+            let field = [];
+            for (let i = 0; i < rows.length; i++) {
+                let row = rows[i];
+                if (filter(rows[i])) {
+                    if (!field[y.indexOf(row[yAxis])]) {
+                        field[y.indexOf(row[yAxis])] = [];
+                    }
+                    field[y.indexOf(row[yAxis])][x.indexOf(row[xAxis])] = row;
+                }
+            }
+
+            //4 - Reduce Field to Z Value
+            let z = field.map(function (row) {
+                return row.map(function (cell) {
+                    return cell[zAxis];
+                });
+            });
+
+            //5 - Reduce Field to Text Value
+            let text = field.map(function (row) {
+                return row.map(function (cell) {
+                    return "Laufzeit: " + cell['laufzeit'] + "<br>Bausparsumme: " + cell['bausparsumme']+"<br>Darlehenssumme: "+ cell['maxDarlehenssumme'];
+                });
+            });
+
+            //6 - Reduce Field to Surface Color Value
+            let surfacecolor = field.map(function (row) {
+                return row.map(function (cell) {
+                    return cell[colorAxis];
+                });
+            });
+
+            return {
+                x: x,
+                y: y,
+                z: z,
+                text: text,
+                surfacecolor: surfacecolor,
+                customdata: field,
+                type: 'surface',
+                'colorscale': colorscale,
+                cmin:cmin,
+                cmax:cmax
+            }
+
+        }
+
+        let filter50s = function (row) {
+            return row.bausparsumme === 50000;
+        };
+        let filter75s = function (row) {
+            return row.bausparsumme === 75000;
+        };
+        let filter100s = function (row) {
+            return row.bausparsumme === 100000;
+        };
+        let filter125s = function (row) {
+            return row.bausparsumme === 125000;
+        };
+
+        let colorscale = [
+            [0, 'rgb(0, 204, 0)'],
+            [1. / 25, 'rgb(63, 153, 0)'],
+            [1. / 8, 'rgb(127, 102, 0)'],
+            [1. / 4, 'rgb(191, 51, 0)'],
+            [1. / 2, 'rgb(210, 25, 0)'],
+            [1., 'rgb(255, 0, 0)'],
+
+        ];
+
+        let data = [
+            createData(rows, filter50s, "monatsbeitrag", "tilgungsbeitrag", "costPerKredit", "laufzeit" , colorscale,5,100),
+            Object.assign(createData(rows, filter75s, "monatsbeitrag", "tilgungsbeitrag", "costPerKredit", "laufzeit", colorscale,5,100), {showscale: false, opacity:0.7}),
+            Object.assign(createData(rows, filter100s, "monatsbeitrag", "tilgungsbeitrag", "costPerKredit", "laufzeit", colorscale,5,100), {showscale: false, opacity:1}),
+        //    Object.assign(createData(rows, filter125s, "monatsbeitrag", "tilgungsbeitrag", "costPerKredit", "laufzeit", colorscale), {showscale: false, opacity:0.7})
+        ];
+
+        let layout = {
+            title: 'Bausparverträge nach Kosten pro Kredit (Farbe nach Laufzeit)',
+            autosize: true,
+            //    width: 600,
+            //    height: 600,
+            margin: {
+                l: 65,
+                r: 50,
+                b: 65,
+                t: 90,
+            },
+            scene: {
+                xaxis: {title: 'x - Monatsbeitrag'},
+                yaxis: {title: 'y - Tilgungsbeitrag'},
+                zaxis: {title: 'z - Kosten/Kredit'},
+            },
+        };
+        Plotly.plot('myDiv', data, layout);
+        myPlot.on('plotly_hover', function (data) {
+            let vertrag = data.points[0].customdata;
+            hoverInfo.innerHTML = createVertragsHtml(data, vertrag);
+        })
+            .on('plotly_unhover', function () {
+                hoverInfo.innerHTML = '';
+            });
+        data = [
+            createData(rows, filter50s, "monatsbeitrag", "tilgungsbeitrag", "kosten", "maxDarlehenssumme"),
+            Object.assign(createData(rows, filter75s, "monatsbeitrag", "tilgungsbeitrag", "kosten", "maxDarlehenssumme"), {showscale: false, opacity:0.7}),
+            Object.assign(createData(rows, filter100s, "monatsbeitrag", "tilgungsbeitrag", "kosten", "maxDarlehenssumme"), {showscale: false, opacity:1}),
+          //  Object.assign(createData(rows, filter125s, "monatsbeitrag", "tilgungsbeitrag", "kosten", "maxDarlehenssumme"), {showscale: false, opacity:0.7})
+        ];
+
+        layout = {
+            title: 'Bausparverträge nach Kosten (Farbe nach Darlehenssumme)',
+            autosize: true,
+            //    width: 600,
+            //    height: 600,
+            margin: {
+                l: 65,
+                r: 50,
+                b: 65,
+                t: 90,
+            },
+            scene: {
+                xaxis: {title: 'x - Monatsbeitrag'},
+                yaxis: {title: 'y - Tilgungsbeitrag'},
+                zaxis: {title: 'z - Kosten'},
+            },
+        };
+        Plotly.plot('myDiv2', data, layout);
+        myPlot2.on('plotly_hover', function (data) {
+            let vertrag = data.points[0].customdata;
+            hoverInfo.innerHTML = createVertragsHtml(data, vertrag);
+        })
+            .on('plotly_unhover', function () {
+                hoverInfo.innerHTML = '';
+            });
+
+        data = [
+            createData(rows, filter50s, "monatsbeitrag", "tilgungsbeitrag", "summeOpportunity", "maxDarlehenssumme"),
+            Object.assign(createData(rows, filter75s, "monatsbeitrag", "tilgungsbeitrag", "summeOpportunity", "maxDarlehenssumme"), {showscale: false, opacity:0.7}),
+            Object.assign(createData(rows, filter100s, "monatsbeitrag", "tilgungsbeitrag", "summeOpportunity", "maxDarlehenssumme"), {showscale: false, opacity:1}),
+            //  Object.assign(createData(rows, filter125s, "monatsbeitrag", "tilgungsbeitrag", "summeOpportunity", "maxDarlehenssumme"), {showscale: false, opacity:0.7})
+        ];
+
+        layout = {
+            title: 'Bausparverträge nach Opportunitätskosten (Farbe nach Darlehenssumme)',
+            autosize: true,
+            //    width: 600,
+            //    height: 600,
+            margin: {
+                l: 65,
+                r: 50,
+                b: 65,
+                t: 90,
+            },
+            scene: {
+                xaxis: {title: 'x - Monatsbeitrag'},
+                yaxis: {title: 'y - Tilgungsbeitrag'},
+                zaxis: {title: 'z - Opportunitätskosten'},
+            },
+        };
+        Plotly.plot('myDiv3', data, layout);
+        myPlot3.on('plotly_hover', function (data) {
+            let vertrag = data.points[0].customdata;
+            hoverInfo.innerHTML = createVertragsHtml(data, vertrag);
+        })
+            .on('plotly_unhover', function () {
+                hoverInfo.innerHTML = '';
+            });
+
+        data = [
+            createData(rows, filter50s, "monatsbeitrag", "tilgungsbeitrag", "costAndOpportunityPerKredit", "maxDarlehenssumme"),
+            Object.assign(createData(rows, filter75s, "monatsbeitrag", "tilgungsbeitrag", "costAndOpportunityPerKredit", "maxDarlehenssumme"), {showscale: false, opacity:0.7}),
+            Object.assign(createData(rows, filter100s, "monatsbeitrag", "tilgungsbeitrag", "costAndOpportunityPerKredit", "maxDarlehenssumme"), {showscale: false, opacity:1}),
+            //  Object.assign(createData(rows, filter125s, "monatsbeitrag", "tilgungsbeitrag", "costAndOpportunityPerKredit", "maxDarlehenssumme"), {showscale: false, opacity:0.7})
+        ];
+
+        layout = {
+            title: 'Bausparverträge nach Kosten+Opportunität pro Kredit (Farbe nach Darlehenssumme)',
+            autosize: true,
+            //    width: 600,
+            //    height: 600,
+            margin: {
+                l: 65,
+                r: 50,
+                b: 65,
+                t: 90,
+            },
+            scene: {
+                xaxis: {title: 'x - Monatsbeitrag'},
+                yaxis: {title: 'y - Tilgungsbeitrag'},
+                zaxis: {title: 'z - Kost+Oppo per Kredit'},
+            },
+        };
+        Plotly.plot('myDiv4', data, layout);
+        myPlot4.on('plotly_hover', function (data) {
+            let vertrag = data.points[0].customdata;
+            hoverInfo.innerHTML = createVertragsHtml(data, vertrag);
+        })
+            .on('plotly_unhover', function () {
+                hoverInfo.innerHTML = '';
+            });
+
+        let createVertragsHtml = function(data, vertrag) {
+            let result = "";
+            try {
+                if(!vertrag) {
+                    vertrag = data.points[0].fullData.customdata[data.points[0].pointNumber[1]][data.points[0].pointNumber[0]];
+                }
+                result += "Bausparsumme: "+vertrag.bausparsumme.toFixed(2)+"€<br>";
+                result += "Mindestsparguthaben: "+(vertrag.mindestsparguthaben*100).toFixed(2)+"%<br>";
+                result += "Zins- und Tilgungsbeitrag mtl: "+vertrag.tilgungsbeitrag.toFixed(2)+"€<br>";
+                result += "Sollzins p.a.: "+(vertrag.sollzins*100).toFixed(2)+"%<br>";
+                result += "Kontogebühr (jährlich): "+(vertrag.kontogebuehr).toFixed(2)+"€<br>";
+                result += "<hr>";
+                result += "Abschlussgebühr: "+(vertrag.abschlussgebuehr).toFixed(2)+"€<br>";
+                result += "Guthabenzins: "+(vertrag.guthabenzins*100).toFixed(2)+"%<br>";
+                result += "Dauer: "+(vertrag.sparplan.length).toFixed(2)+" Jahre<br>";
+                result += "Sparbeiträge und vL: "+(vertrag.summeSparbeitraege).toFixed(2)+"€<br>";
+                result += "Guthabenzinsen: "+(vertrag.summeGuthabenzinsen).toFixed(2)+"€<br>";
+                result += "Gebühren: "+(vertrag.summeGebuehren).toFixed(2)+"€<br>";
+                result += "Bausparguthaben bei Auszahlung: "+(vertrag.maxBausparGuthaben).toFixed(2)+"€<br>";
+                result += "Sparbeiträge: "+(vertrag.startbetrag).toFixed(2)+"€ + mtl. "+(vertrag.monatsbeitrag).toFixed(2)+"€<br>";
+                result += "<hr>";
+                result += "Darlehen: "+(vertrag.maxDarlehenssumme).toFixed(2)+"€<br>";
+                result += "Sollzins p.a.: "+(vertrag.sollzins*100).toFixed(2)+"%<br>";
+                result += "Tilgungsdauer: "+(vertrag.tilgungsplan.length).toFixed(2)+" Jahre<br>";
+                result += "Tilgungsbeiträge mtl.: "+(vertrag.tilgungsbeitrag).toFixed(2)+"€<br>";
+                result += "Tilgungsbeiträge gesamt: "+(vertrag.summeTilgungsbeitraege).toFixed(2)+"€<br>";
+                result += "Sollzinsen gesamt: "+(vertrag.summeSollzinsen).toFixed(2)+"€<br>";
+                result += "<hr>";
+                result += "Kosten: "+(vertrag.kosten).toFixed(2)+"€<br>";
+                result += "Laufzeit: "+(vertrag.laufzeit).toFixed(2)+" Jahre<br>";
+                result += "Cost/Kredit: "+(vertrag.costPerKredit*100).toFixed(2)+"%<br>";
+                result += "Opportunity Costs: "+(vertrag.summeOpportunity).toFixed(2)+"€<br>";
+                result += "Cost+Opp/Kredit: "+(vertrag.costAndOpportunityPerKredit*100).toFixed(2)+"%<br>";
+            } catch (e) {
+                result = e.message;
+                console.log(data);
+            }
+            return result;
+        }
+    });
+
+
+</script>
+</body>
